@@ -1,0 +1,72 @@
+server
+{
+	server_name <%= server_name %>;
+	root <%= root %>;
+
+	client_max_body_size 100M;
+	fastcgi_read_timeout 1800;
+
+	index <%= index %>;
+
+	location /
+	{
+		try_files $uri $uri/ /<%= index %>?$args;
+	} 
+
+        set $sizeImage 200;
+        if ($arg_s){
+            set $sizeImage $arg_s;
+        }
+
+        location ~ ^\/module\/(?<vendor>[^\/]*)\/(?<module>[^\/]*)\/(?<file>.*)$ {
+            alias /vagrant/src/maze.core/src/modules/$vendor/$module/public/$file;
+        }
+
+        location ~ ^/avatar/(?<hash>.*)$ {
+            error_page 404 403 =404 /img/dummy_user_200.png;
+            access_log off;
+            image_filter resize $sizeImage -;
+            image_filter_jpeg_quality 100;
+            alias /vagrant/src/maze.core/src/data/uploads/avatar/$hash.gif;
+        }
+
+	location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+		expires max;
+		log_not_found off;
+		access_log off;
+	}
+	
+	location ~ \.php$
+	{
+		try_files $uri =404;
+
+		include fastcgi_params;
+		fastcgi_index <%= index %>;
+		fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+		<% if @application_env %>
+		fastcgi_param APPLICATION_ENV <%= application_env %>;
+		<% end %>
+		fastcgi_pass <%= upstream %>;
+
+                fastcgi_temp_file_write_size 10m;
+                fastcgi_busy_buffers_size 512k;
+                fastcgi_buffer_size 512k;
+                fastcgi_buffers 16 512k;
+                fastcgi_connect_timeout 300;
+                fastcgi_send_timeout 300;
+                fastcgi_read_timeout 300;
+                fastcgi_intercept_errors on;
+                fastcgi_next_upstream error invalid_header timeout http_500;
+	}
+
+	<% if @application_env == "production" %>
+	error_page 500 502 503 504 = /50x.html;
+	location = /50x.html
+	{
+		try_files /usr/share/nginx/www/50x.html @error;
+		internal;
+	}
+	<% end %>
+
+	<%= custom %>
+}

@@ -1,0 +1,297 @@
+#!/bin/bash
+#
+# maze report actions
+#
+###############################################################################
+
+MAZE_CONFIG_PATH="<%= @configPath %>"
+MODULES=`maze modules`
+
+_generateReport()
+{
+    MODULE="$1"
+
+    REPORT_SCRIPT="${MAZE_LIB}/${MODULE}/maze-report"
+    if [ ! -f "$REPORT_SCRIPT" ]; then
+        echo "Module ${MODULE} has no report implementation. Skipped..."
+        return 120
+    fi
+    if [ ! -x "$REPORT_SCRIPT" ]; then
+        echo "Report script ${REPORT_SCRIPT} of module ${MODULE} is not executable"
+        return 121
+    fi
+
+    maze ${MODULE} report
+}
+
+init()
+{
+    if [ "`ps cax | grep "maze-apply" -c`" -gt 2 ]; then
+        echo "Maze apply instance is allready running. exiting..."
+        exit 99
+    fi
+    if [ "`ps cax | grep "maze-report" -c`" -gt 2 ]; then
+        echo "Maze report instance is allready running. exiting..."
+        exit 98
+    fi
+
+    if [ -z "${MAZE_CONFIG_PATH}" ];then
+        echo "Maze config path not set"
+        exit 101
+    fi
+    if [ ! -f "${MAZE_CONFIG_PATH}" ];then
+        echo "Maze config file does not exist"
+        exit 102
+    fi
+
+    source "${MAZE_CONFIG_PATH}"
+    if [ "$?" != 0 ];then
+        echo "Could not load maze config file ${MAZE_CONFIG_PATH}"
+        exit 103
+    fi
+
+    if [ ! -d "$MAZE_DIR_REPORT" ];then
+        if ! `mkdir $MAZE_DIR_REPORT`;then
+            echo "Could not create report dir ${MAZE_DIR_REPORT}"
+            exit 104
+        fi
+    fi
+
+    if [ -z "$MODULES" ]; then
+        echo "No modules installed"
+        exit 105
+    fi
+
+    if [ -n "$MODULE" ];then
+        MODULE_LOOKUP=`echo "${MODULES}" | grep "^${MODULE}$"`
+        if [ "$?" != 0 ];then
+            echo "Module ${MODULE} does not seems to be installed"
+            exit 110
+        fi
+    fi
+}
+
+send()
+{
+    for MODULE in ${MODULES}; do
+        REPORT_FILE="${MAZE_DIR_REPORT}/${MODULE}.rpt"
+        if [ ! -f "$REPORT_FILE" ];then
+            echo "No Report for module ${MODULE} found"
+            return 130
+        fi
+
+        REPORT=`cat $REPORT_FILE`
+
+        echo "Sending module ${MODULE} report..."
+       
+        RESULT=`sendModule "${MODULE}" "${REPORT}"`
+        if [ "$?" != 0 ];then
+            echo "$RESULT"
+            return 114
+        fi
+
+        echo "Sending report of module ${MODULE} was succesful"
+    done
+
+    return 0
+}
+
+sendModule()
+{
+    MODULE="$1"
+    REPORT="$2"
+
+    URL="${MAZE_HOST}/api/reports/${MODULE}"
+
+    REPORT_FILE_TMP="${MAZE_DIR_REPORT}/tmp_${MODULE}.rpt"
+    RESULT_TMP=`echo "${REPORT}" > ${REPORT_FILE_TMP}`
+    if [ "$?" != 0 ];then
+        echo "Could not write report tmp file ${REPORT_FILE_TMP}"
+        return 116
+    fi
+
+    # show http response
+    curl -H "${HEADER_REQUESTED_WITH}" -H "${HEADER_NODE_IP}" -H "${HEADER_NODE_NAME}" -H "${HEADER_NODE_API}" -F "report=@${REPORT_FILE_TMP}" "${URL}"
+    echo "curl -H \"${HEADER_REQUESTED_WITH}\" -H \"${HEADER_NODE_IP}\" -H \"${HEADER_NODE_NAME}\" -H \"${HEADER_NODE_API}\" -F \"report=@${REPORT_FILE_TMP}\" \"${URL}\""
+
+    #HTTP_CODE=`curl -s -o /dev/null -w "%{http_code}" -H "${HEADER_REQUESTED_WITH}" -H "${HEADER_NODE_IP}" -H "${HEADER_NODE_NAME}" -H "${HEADER_NODE_API}" -F "report=@${REPORT_FILE_TMP}" "${URL}"`
+    #STATUS="$?"
+
+    #if [ "$HTTP_CODE" != 200 ];then
+    #    echo "Failed to send report of module ${MODULE} with Response code ${HTTP_CODE}"
+    #    return 117
+    #fi
+
+    RESULT_TMP=`rm ${REPORT_FILE_TMP}`
+    if [ "$?" != 0 ];then
+        echo "Failed to delete tmp file ${REPORT_FILE_TMP}"
+    fi
+
+    if [ "$STATUS" != 0 ];then
+        echo "Failed to send report of module ${MODULE} to ${URL}"
+        return 115
+    fi
+}
+
+renderHelp()
+{
+    echo "maze report <[options]> [|send]
+$*
+    Options:
+            -h                  Render help
+            -f                  force report sending
+            -M (module name)    Use certain Module
+
+    Methods:
+            [] default          Do report of every installed module and send when
+                                there are changes
+
+                                Optional Parameters:
+                                    -M module name -> just a certain module
+                                    -f force report sending
+                            
+            [send]              Send existing reports of installed modules again
+
+                                Optional Parameters:
+                                    -M module name -> just a certain module
+"
+}
+
+report()
+{
+    for MODULE in ${MODULES}; do
+        reportModule "$MODULE"
+        STATUS="$?"
+        if [ "$STATUS" != 0 ];then
+            echo "Report ${MODULE} failed with ${STATUS}"
+        fi
+    done
+
+    return 0
+}
+
+reportModule()
+{
+    REPORT=`_generateReport "$MODULE"`
+    STATUS="$?"
+    if [ "$STATUS" != 0 ]; then
+        echo "Report of ${MODULE} failed with status ${STATUS}:"
+        if [ -n "$REPORT" ];then
+            echo "REPORT"
+        fi
+
+        return $STATUS
+    fi
+    
+    REPORT_FILE="${MAZE_DIR_REPORT}/${MODULE}.rpt"
+    if [ -f "$REPORT_FILE" ];then
+        REPORT_MD5_BEFORE=`md5sum ${REPORT_FILE} | awk '{print $1}'`
+    fi
+    
+    REPORT_MD5=`echo "$REPORT" | md5sum | awk '{print $1}'`
+    if [ "$REPORT_MD5" != "$REPORT_MD5_BEFORE" ];then
+        echo "Changes in module ${MODULE}. Send report..."
+
+        sendModule "${MODULE}" "${REPORT}"
+        if [ "$?" != 0 ];then
+            echo "$RESULT"
+            return 114
+        fi
+
+        echo "Sending report of module ${MODULE} was succesful"
+
+        if ! `echo "${REPORT}" > ${REPORT_FILE}`;then
+            echo "Writing local report ${REPORT_FILE} file failed"
+            return 113
+        fi
+    elif [ "$FORCE_SENDING" == "TRUE" ]; then
+        echo "Forced report sending of module ${MODULE}. Send report..."
+
+        sendModule "${MODULE}" "${REPORT}"
+        if [ "$?" != 0 ];then
+            echo "$RESULT"
+            return 114
+        fi
+
+        echo "Sending report of module ${MODULE} was succesful"
+
+        if ! `echo "${REPORT}" > ${REPORT_FILE}`;then
+            echo "Writing local report ${REPORT_FILE} file failed"
+            return 113
+        fi
+    else
+        echo "No changes in ${MODULE}"
+    fi
+}
+
+# parse options
+while getopts "fM:" opt; do
+    case $opt in
+        M)
+            if [[ $OPTARG = -* ]]; then
+                echo "Option -M has a invalid argument"
+                exit 106
+            fi
+
+            MODULE="$OPTARG"
+        ;;
+        h)
+            renderHelp
+            exit 0
+        ;;
+        f)
+            FORCE_SENDING=TRUE
+        ;;
+        \?)
+            renderHelp
+            exit 1
+        ;;
+        :)
+            echo "Option -$OPTARG requires an argument." >&2
+            exit 1
+        ;;
+    esac
+done
+
+init
+
+ARG1=${@:$OPTIND:1}
+case $ARG1 in
+    send)
+        if [ -n "$MODULE" ];then
+            REPORT_FILE="${MAZE_DIR_REPORT}/${MODULE}.rpt"
+            if [ ! -f "$REPORT_FILE" ];then
+                echo "No Report for module ${MODULE} found"
+                exit 130
+            fi
+
+            REPORT=`cat $REPORT_FILE`
+
+            echo "Sending module ${MODULE} report..."
+
+            sendModule "${MODULE}" "${REPORT}"
+            STATUS="$?"
+            if [ "$STATUS" == 0 ];then
+                echo "Sending report of module ${MODULE} was succesful"
+            fi
+
+            exit "$STATUS"
+        fi
+
+        send
+        exit "$?"
+    ;;
+    *)
+        if [ -n "$MODULE" ];then
+            reportModule "$MODULE"
+        else
+            report
+        fi
+
+        
+        exit "$?"
+    ;;
+esac
+
+renderHelp
+exit 1

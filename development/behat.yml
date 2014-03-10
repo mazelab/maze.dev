@@ -1,0 +1,36 @@
+## YAML Template
+default:
+    context:
+        class:  'FeatureContext'
+    formatter:
+        name:               progress
+        parameters:
+            output_path:    null
+    extensions:
+        Behat\MinkExtension\Extension:
+            default_session: selenium2
+            javascript_session: selenium2
+            base_url: 'http://10.33.33.10'
+            goutte:
+                guzzle_parameters:
+                    curl.options:
+                       CURLOPT_SSL_VERIFYPEER: false
+                       CURLOPT_CERTINFO: false
+                       CURLOPT_TIMEOUT: 120
+                    ssl.certificate_authority: false
+            selenium2:
+                wd_host: "http://localhost:8643/wd/hub"
+                capabilities: { "platform": "WINDOWS"}
+
+jenkins:
+    context:
+        class:  'FeatureContext'
+    formatter:
+        name:               progress,junit
+        parameters:
+            output_path:    null,junit
+    extensions:
+        Behat\MinkExtension\Extension:
+            base_url: 'http://localhost'
+            selenium2:
+                wd_host: "http://localhost:8643/wd/hub"

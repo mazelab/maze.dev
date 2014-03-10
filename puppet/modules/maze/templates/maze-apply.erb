@@ -1,0 +1,201 @@
+#!/bin/bash
+#
+# maze report actions
+#
+###############################################################################
+
+MAZE_CONFIG_PATH="<%= @configPath %>"
+MODULES=`maze modules`
+
+apply()
+{
+    for MODULE in ${MODULES}; do
+        echo "Applying ${MODULE}..."
+
+        applyModule $MODULE
+
+        echo "Finished applying ${MODULE}"
+    done
+}
+
+applyModule()
+{
+    MODULE="$1"
+
+    REPORT=`maze report -M ${MODULE}`
+    if [ "$?" != 0 ];then
+        echo "Failed to report module ${MODULE}. Stopping..."
+        return 121
+    fi
+
+    maze commands -M ${MODULE} load
+    if [ "$?" != 0 ];then
+        return 117
+    fi
+    COMMANDS=`maze commands -M ${MODULE}`
+    if [ "$?" != 0 ];then
+        return 116
+    fi
+
+    REPORT_HASH=`echo "$COMMANDS" | head -n1 - | grep -e "^# [0-9a-f]\{32\}$" | awk {'print $NF'}`
+    if [ -z "$REPORT_HASH" ]; then
+        echo "Report hash in module ${MODULE} not found. Sending report and skip..."
+
+        REPORT=`maze report -M ${MODULE} send`
+        if [ "$?" != 0 ];then
+            echo "Failed to send report module ${MODULE}. Stopping..."
+            return 121
+        fi
+
+        return 118
+    fi
+
+    REPORT_FILE="${MAZE_DIR_REPORT}/${MODULE}.rpt"
+    if [ ! -f "$REPORT_FILE" ];then
+        echo "Report for module ${MODULE} not found. Stopping..."
+        return 119
+    fi
+
+    LOCAL_REPORT_HASH=`md5sum ${MAZE_DIR_REPORT}/${MODULE}.rpt | awk {'print $1'}`
+    if [ "$REPORT_HASH" != "$LOCAL_REPORT_HASH" ];then
+        echo "Commands do not seem to be up to date. Sending forced report and skip..."
+
+        REPORT=`maze report -f -M ${MODULE}`
+        if [ "$?" != 0 ];then
+            echo "Failed to send report module ${MODULE}. Stopping..."
+            return 121
+        fi
+        
+        return 120
+    fi
+
+    # remove all lines with "#"
+    COMMANDS=`echo "$COMMANDS" | grep -v "^#"`
+    if [ -z "$COMMANDS" ];then
+        echo "Nothing to do..."
+        return 0
+    fi
+    
+    IFS=''
+    echo "$COMMANDS" | while read -r COMMAND; do
+        DISCAPED_CMD=`echo -e ${COMMAND}`
+        CMD="maze ${DISCAPED_CMD}"
+        
+        RESULT=`eval "$CMD"`
+        STATUS="$?"
+        if [ "$STATUS" != 0 ];then
+            echo "Command ($CMD) failed whith status ${STATUS}:"
+            echo "$RESULT"
+        fi
+    done
+
+    REPORT=`maze report -M ${MODULE}`
+    if [ "$?" != 0 ];then
+        echo "Failed to report after executing commands of module ${MODULE}"
+        return 122
+    fi
+}
+
+init()
+{
+    if [ "`ps cax | grep "maze-apply" -c`" -gt 2 ]; then
+        echo "Maze apply instance is allready running. exiting..."
+        exit 99
+    fi
+    if [ "`ps cax | grep "maze-report" -c`" -gt 2 ]; then
+        echo "Maze report instance is allready running. exiting..."
+        exit 98
+    fi
+
+    if [ -z "${MAZE_CONFIG_PATH}" ];then
+        echo "Maze config path not set"
+        exit 101
+    fi
+    if [ ! -f "${MAZE_CONFIG_PATH}" ];then
+        echo "Maze config file does not exist"
+        exit 102
+    fi
+
+    source "${MAZE_CONFIG_PATH}"
+    if [ "$?" != 0 ];then
+        echo "Could not load maze config file ${MAZE_CONFIG_PATH}"
+        exit 103
+    fi
+
+    if [ -z "$MODULES" ]; then
+        echo "No modules installed"
+        exit 105
+    fi
+
+    if [ -n "$MODULE" ];then
+        MODULE_LOOKUP=`echo "${MODULES}" | grep "^${MODULE}$"`
+        if [ "$?" != 0 ];then
+            echo "Module ${MODULE} does not seems to be installed"
+            exit 110
+        fi
+    fi
+}
+
+renderHelp()
+{
+    echo "maze apply <[options]>
+$*
+    Options:
+            -h                  Render help
+            -M (module name)    Use certain Module
+
+    Methods:
+            [] default          Apply commands of all modules or a certain module.
+                                Reports changes first and only applies commands where
+                                the reportId in the commands file is the same as the
+                                local report. This secures that admin changes wont
+                                be overwritten.
+
+                                Optional Parameters:
+                                    -M module name -> use certain module
+"
+}
+
+# parse options
+while getopts "M:" opt; do
+    case $opt in
+        M)
+            if [[ $OPTARG = -* ]]; then
+                echo "Option -M has a invalid argument"
+                exit 106
+            fi
+
+            MODULE="$OPTARG"
+        ;;
+        h)
+            renderHelp
+            exit 0
+        ;;
+        \?)
+            renderHelp
+            exit 1
+        ;;
+        :)
+            echo "Option -$OPTARG requires an argument." >&2
+            exit 1
+        ;;
+    esac
+done
+
+init
+
+ARG1=${@:$OPTIND:1}
+case $ARG1 in
+    *)
+        if [ -n "$MODULE" ];then
+            applyModule "$MODULE"
+        else
+            apply
+        fi
+
+        exit "$?"
+    ;;
+esac
+
+renderHelp
+exit 1

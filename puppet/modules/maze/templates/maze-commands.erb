@@ -1,0 +1,183 @@
+#!/bin/bash
+#
+#
+# maze git abstraction
+#
+###############################################################################
+
+MAZE_CONFIG_PATH="<%= @configPath %>"
+MODULES=`maze modules`
+
+commands()
+{
+    MODULE="$1"
+
+    if [ ! -f "${MAZE_DIR_COMMAND}/${MODULE}.cmd" ];then
+        echo "Commands file ${MAZE_DIR_COMMAND}/${MODULE}.cmd not found. Try to load before"
+        return 111
+    fi
+
+    COMMANDS=`cat "${MAZE_DIR_COMMAND}/${MODULE}.cmd"`
+
+    echo "$COMMANDS"
+}
+
+exitWithMessage()
+{
+    MESSAGE_VAR="MESSAGE_$STATE"
+    if [ "${!MESSAGE_VAR}" != "" ];then
+        echo "${!MESSAGE_VAR}"
+    fi
+
+    exit $STATE
+}
+
+init()
+{
+    if [ -z "${MAZE_CONFIG_PATH}" ];then
+        echo "Maze config path not set"
+        exit 101
+    fi
+    if [ ! -f "${MAZE_CONFIG_PATH}" ];then
+        echo "Maze config file does not exist"
+        exit 102
+    fi
+
+    source "${MAZE_CONFIG_PATH}"
+    if [ "$?" != 0 ];then
+        echo "Could not load maze config file ${MAZE_CONFIG_PATH}"
+        exit 103
+    fi
+
+    if [ -z "$MODULES" ]; then
+        echo "No modules installed"
+        exit 105
+    fi
+
+    if [ -z "$MAZE_API" ];then
+        echo "Maze api key not set"
+        exit 106
+    fi
+    if [ -z "$MAZE_HOST" ];then
+        echo "Maze host not set"
+        exit 107
+    fi
+    if [ -z "$MAZE_DIR_COMMAND" ];then
+        echo "Command path not set"
+        exit 108
+    fi
+
+    if [ ! -d "$MAZE_DIR_COMMAND" ];then
+        if ! `mkdir $MAZE_DIR_COMMAND`;then
+            echo "Could not create command dir ${MAZE_DIR_COMMAND}"
+            exit 109
+        fi
+    fi
+
+    if [ -n "$MODULE" ];then
+        MODULE_LOOKUP=`echo "${MODULES}" | grep "^${MODULE}$"`
+        if [ "$?" != 0 ];then
+            echo "Module ${MODULE} does not seems to be installed"
+            exit 110
+        fi
+    fi
+}
+
+load()
+{
+    for MODULE in ${MODULES}; do
+        echo "Loading commands of ${MODULE}..."
+
+        loadModule $MODULE
+        if [ "$?" != 0 ];then
+            echo "Loading failed for module ${MODULE}"
+            continue
+        fi
+
+        echo "Finished loading commands of ${MODULE}"
+    done
+}
+
+loadModule()
+{
+    MODULE="$1"
+
+    URL="${MAZE_HOST}/api/commands/${MODULE}"
+
+    REQUEST=`wget --server-response -q -O "${MAZE_DIR_COMMAND}/${MODULE}.cmd" --header="${HEADER_REQUESTED_WITH}" --header="${HEADER_NODE_IP}" --header="${HEADER_NODE_NAME}" --header="${HEADER_NODE_API}" "${URL}" 2>&1`
+    HTTP_CODE=`echo $REQUEST | grep "HTTP/" | awk '{print $2}'`
+    if [ "$?" != 0 -o "$HTTP_CODE" != 200 ];then
+        return 110
+    fi
+}
+
+renderHelp()
+{
+    echo "maze commands <[options]> [|load]
+$*
+    Options:
+            -h                  Render help
+            -M (module name)    Use certain Module
+
+    Methods:
+            [] default          Show commands of a certain module
+
+                                Required Parameters:
+                                    -M module name -> use certain module
+                            
+            [load]              Load commands of all modules or a certain module
+
+                                Optional Parameters:
+                                    -M module name -> just a certain module
+"
+}
+
+# parse options
+while getopts "M:" opt; do
+    case $opt in
+        M)
+            if [[ $OPTARG = -* ]]; then
+                echo "Option -M has a invalid argument"
+                exit 106
+            fi
+
+            MODULE="$OPTARG"
+        ;;
+        h)
+            renderHelp
+            exit 0
+        ;;
+        \?)
+            renderHelp
+            exit 1
+        ;;
+        :)
+            echo "Option -$OPTARG requires an argument." >&2
+            exit 1
+        ;;
+    esac
+done
+
+init
+
+ARG1=${@:$OPTIND:1}
+case $ARG1 in
+    load)
+        if [ -n "$MODULE" ];then
+            loadModule "$MODULE"
+        else
+            load
+        fi
+        
+        exit "$?"
+    ;;
+    *)
+        if [ -n "$MODULE" ];then
+            commands "$MODULE"
+            exit "$?"
+        fi
+    ;;
+esac
+
+renderHelp
+exit 1

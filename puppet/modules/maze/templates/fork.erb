@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# maze fork -> script controll/access
+#######################################
+
+MESSAGE_USAGE="usage: maze [module|command] [modul command] params"
+
+LIBRARY="<%= @mazeLib %>"
+PREFIX="maze"
+
+if [ -z $1 ]; then
+    echo $MESSAGE_USAGE
+    exit 101
+fi
+
+# script lookup
+if [ -f $LIBRARY/$PREFIX-$1 ]; then
+    SCRIPT_PATH="$LIBRARY/$PREFIX-$1"
+    shift
+
+    if [ -s "$SCRIPT_PATH" -o -x "$SCRIPT_PATH" ]; then
+        $SCRIPT_PATH "$@"
+        exit $?
+    fi
+
+elif [ -d "$LIBRARY/$1" -a -n "$2" ]; then
+    MODULE="$1"
+    SCRIPT_PATH="$LIBRARY/$MODULE/$PREFIX-$2"
+    shift && shift
+
+    if [ -s "$SCRIPT_PATH" -o -x "$SCRIPT_PATH" ]; then
+        $SCRIPT_PATH "$@"
+        exit $?
+    fi
+
+fi
+
+echo "command/module not found"
+exit 102

@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+#
+# maze git abstraction
+#
+###############################################################################
+
+MAZE_CONFIG_PATH="<%= @configPath %>"
+
+getModules()
+{
+    echo "`ls -l $MAZE_LIB | grep ^d | awk '{print  $(NF)}'`"
+}
+
+init()
+{
+    if [ -z "${MAZE_CONFIG_PATH}" ];then
+        echo "Maze config path not set"
+        exit 101
+    fi
+    if [ ! -f "${MAZE_CONFIG_PATH}" ];then
+        echo "Maze config file does not exist"
+        exit 102
+    fi
+
+    source "${MAZE_CONFIG_PATH}"
+    if [ "$?" != 0 ];then
+        echo "Could not load maze config file ${MAZE_CONFIG_PATH}"
+        exit 103
+    fi
+
+    if [ -z "$MAZE_LIB" ];then
+        echo "Maze lib not set"
+        exit 110
+    fi
+
+    if [ ! -d "$MAZE_LIB" ];then
+        echo "Maze lib folder ${MAZE_LIB} does not exist"
+        exit 111
+    fi
+}
+
+init
+
+getModules

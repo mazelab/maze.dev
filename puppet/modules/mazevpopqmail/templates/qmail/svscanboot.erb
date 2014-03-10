@@ -1,0 +1,34 @@
+#!/bin/sh
+
+procids=`ps -ef | grep  /command/svscanboot | grep -v grep | awk '{print $2}'`
+svscans=`ps -ef | grep -w svscan | grep -v grep | awk '{print $2}'`
+
+case "$1" in
+    start)
+        if ! [ $procids  ]; then
+            /command/svscanboot &
+        fi
+    ;;
+    stop)
+        if [ $procids  ]; then
+            kill $procids $svscans
+        fi
+
+        if [ 'ps | grep supervise | grep -v grep' ]; then
+            killall -g supervise
+        fi
+    ;;
+    status)
+        if [ $procids  ]; then
+            exit 0
+        else 
+            exit 1
+        fi
+    ;;
+    restart)
+        $0 stop
+        $0 start
+    ;;
+esac
+
+exit 0

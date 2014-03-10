@@ -1,0 +1,3 @@
+#!/bin/sh
+export PATH=/var/qmail/bin:/usr/local/bin:/usr/bin:/bin
+exec setuidgid qmaill multilog t s100000 n20 /var/log/qmail/qmail-send 2>&1

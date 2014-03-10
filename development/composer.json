@@ -1,0 +1,23 @@
+{
+    "name": "cdsinternetagentur/maze-dashboard",
+    "description": "Behat tests",
+    "authors": [
+        {
+            "name": "jens.klose",
+            "email": "jens.klose@googlemail.com"
+        }
+    ],
+    "require": {
+        "behat/behat": "2.4.*@stable",
+        "behat/mink": "1.4.*@stable",
+        "behat/mink-extension": "*",
+        "behat/mink-goutte-driver": "*",
+        "behat/mink-zombie-driver": "*",
+        "behat/mink-selenium2-driver": "*",
+        "guzzle/guzzle": "v3.5.0"
+    },
+    "minimum-stability": "dev",
+    "config": {
+        "bin-dir": "bin/"
+    }
+}

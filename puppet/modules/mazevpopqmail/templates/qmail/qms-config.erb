@@ -1,0 +1,48 @@
+#!/bin/sh
+
+if [ "$1" != "install" ]; then
+    INSTALL=
+else
+    INSTALL="--install"
+fi
+
+if [ -f "/var/qmail/bin/qmail-scanner-queue.pl"]; then
+    rm /var/qmail/bin/qmail-scanner-queue.pl
+fi
+
+./configure --domain "<%= @fqdn %>" \
+            --qs-user "vpopmail" \
+            --qs-group "vchkpw" \
+            --spooldir "/var/spool/qmailscan/" \
+            --qmaildir "/var/qmail/" \
+            --bindir "/var/qmail/bin/" \
+            --qmail-queue-binary "/var/qmail/bin/qmail-queue" \
+            --admin "root" \
+            --local-domains "<%= @fqdn %>" \
+            --silent-viruses "none" \
+            --notify "none" \
+            --skip-text-msgs "yes" \
+            --block-password-protected "no" \
+            --minidebug "1" \
+            --unzip "no" \
+            --add-dscr-hdrs "0" \
+            --archive "no"  \
+            --redundant "yes" \
+            --log-details "syslog" \
+            --log-crypto "no" \
+            --fix-mime "2" \
+            --dscr-hdrs-text 0 \
+            --ignore-eol-check "no" \
+            --virus-to-delete "no" \
+            --settings-per-domain "yes" \
+            --sa-delta "0" \
+            --sa-alt "no" \
+            --sa-report "yes" \
+            --sa-quarantine "0" \
+            --sa-delete "0" \
+            --sa-reject "no" \
+            --sa-subject "*SPAM*" \
+            --scanners "spamassassin" \
+            --skip-setuid-test \
+            --batch \
+            "$INSTALL"

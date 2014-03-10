@@ -1,0 +1,5 @@
+#!/bin/sh
+export PATH=/var/qmail/bin:/usr/local/bin:/usr/bin:/bin
+
+exec tcpserver -H -R -v -c100 0 110 qmail-popup <%= @fqdn %> \
+    /home/vpopmail/bin/vchkpw qmail-pop3d Maildir 2>&1

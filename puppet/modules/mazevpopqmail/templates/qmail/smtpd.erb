@@ -1,0 +1,41 @@
+#!/bin/sh
+QMAILDUID=`id -u vpopmail`
+NOFILESGID=`id -g vpopmail`
+MAXSMTPD=`cat /var/qmail/control/concurrencyincoming`
+LOCAL=`head -1 /var/qmail/control/me`
+
+# This enables greetdelay anti-spam functionality on rblsmtpd
+export GREETDELAY=5
+
+# This disables rblsmtpd reject
+#export RBLSMTPD=""
+
+export SSL=0
+export FORCE_TLS=0
+export DENY_TLS=0
+export AUTH=1
+export REQUIRE_AUTH=0
+export ALLOW_INSECURE_AUTH=0
+export ALLOW_CRAM=0
+export QMAILQUEUE="/var/qmail/bin/qmail-scanner-queue.pl"
+
+export QMAILSMTPD_LOG_MAIL=1
+export QMAILSMTPD_LOG_RCPT=1
+
+if [ -z "$QMAILDUID" -o -z "$NOFILESGID" -o -z "$MAXSMTPD" -o -z "$LOCAL" ]; then
+    echo QMAILDUID, NOFILESGID, MAXSMTPD, or LOCAL is unset in
+    echo /var/qmail/supervise/qmail-smtpd/run
+    exit 1
+fi
+
+if [ ! -f /var/qmail/control/rcpthosts ]; then
+    echo "No /var/qmail/control/rcpthosts!"
+    echo "Refusing to start SMTP listener because it'll create an open relay"
+    exit 1
+fi
+
+exec /usr/local/bin/softlimit -m 300000000 \
+    tcpserver -v -R -l "$LOCAL" -x /etc/tcp.smtp.cdb -c "$MAXSMTPD" \
+    -u "$QMAILDUID" -g "$NOFILESGID" 0 smtp \
+    /var/qmail/bin/qmail-smtpd \
+    $LOCAL /home/vpopmail/bin/vchkpw /bin/true 2>&1
