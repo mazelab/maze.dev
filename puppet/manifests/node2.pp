@@ -17,10 +17,8 @@ class { 'maze':
     mazeHost => '10.33.33.10'
 }
 
-class { 'mazevpopqmail':}
+class { ['mazevpopqmail', 'mazestorage', 'mazemongodb']:}
 
 class { 'mazenginx':
     template => 'configure/nginx.conf'
 }
-
-class { 'mazestorage':}
