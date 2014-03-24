@@ -1,3 +1,31 @@
+# = Class: maze::script
+#
+# This class is used to deploy a maze script
+#
+#
+# == Parameters
+#
+#
+# Default class params - As defined in maze::params.
+#
+# [*content*]
+#    set maze script content directly
+#
+# [*source*]
+#   set maze script content over puppet source
+#
+# [*fork*]
+#   file path of fork script which calls other maze scripts
+#
+# [*path*]
+#   maze script base path
+#
+# [*target*]
+#   maze script file path relative to path (basepath)
+#
+# == Author
+#   CDS-Internetagentur
+#
 define maze::script (
     $content = false,
     $source = false,

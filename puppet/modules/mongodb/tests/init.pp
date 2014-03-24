@@ -1,1 +1,4 @@
-include mongodb
+# Default class installation
+#
+class { 'mongodb':
+}

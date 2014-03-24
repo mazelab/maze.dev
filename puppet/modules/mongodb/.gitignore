@@ -1,3 +1,9 @@
+/.gradle
+/metadata.json
+/.rvmrc
+build
 pkg/
-.DS_Store
-.vagrant
+Session.vim
+spec/fixtures
+.*.sw[a-z]
+*.un~

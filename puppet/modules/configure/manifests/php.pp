@@ -1,47 +1,51 @@
-class configure::php
-{
-    include phpfpm
+class configure::php (
+) {
 
-    package { ['php5', 'postfix', 'mc', 'g++', 'libexpat1-dev']:
-        ensure => latest,
+    service { 'php5-fpm':
+      ensure     => true,
+      hasstatus  => true,
+      hasrestart => true
     }
-    package { ["php5-mcrypt"]:
-        require => [Class["nginx::install"], Package["php5-fpm"]],
-        ensure  => latest,
-        notify  => Class['phpfpm::service']
+
+    package{ ['php-pear', 'make']:
+        ensure => 'latest'
     }
+
+    php::module{ ['gd', 'fpm', 'mcrypt', 'xdebug', 'cli', 'curl']:}
 
     file_line { '/etc/php5/fpm/pool.d/www.conf - www-user':
         path => '/etc/php5/fpm/pool.d/www.conf',
         line => 'user = vagrant',
-        require => [Class['nginx::install'], Package['php5-fpm']],
+        require => Package['php5-fpm'],
+        notify => Service['php5-fpm']
     }
     file_line { '/etc/php5/fpm/pool.d/www.conf - www-group':
         path => '/etc/php5/fpm/pool.d/www.conf',
         line => 'group = vagrant',
-        require => [Class['nginx::install'], Package['php5-fpm']],
+        require => Package['php5-fpm'],
+        notify => Service['php5-fpm']
     }
 
-    file_line { 'xdebug enable':
-        path => '/etc/php5/conf.d/xdebug.ini',
-        line => 'xdebug.remote_enable=1',
-        require => [Class['nginx::install'], Package['php5-fpm', 'php5-xdebug']],
+    php::conf{'xdebug.conf':
+        path => '/etc/php5/conf.d/xdebug.conf.ini',
+        template => 'configure/xdebug.conf',
+        notify => Service['php5-fpm']
     }
-    file_line { 'xdebug handler':
-        path => '/etc/php5/conf.d/xdebug.ini',
-        line => 'xdebug.remote_handler=dbgp',
-        require => [Class['nginx::install'], Package['php5-fpm', 'php5-xdebug'], File_line['xdebug enable']],
+
+    php::conf{'mongo.ini':
+        path => '/etc/php5/conf.d/mongo.ini',
+        content => 'extension=mongo.so',
+        require => Exec['php5-mongodb-extention'],
+        notify => Service['php5-fpm']
     }
-    file_line { 'xdebug host':
-        path => '/etc/php5/conf.d/xdebug.ini',
-        line => 'xdebug.remote_host=10.0.2.2',
-        require => [Class['nginx::install'], Package['php5-fpm', 'php5-xdebug'], File_line['xdebug handler']],
-    }
-    file_line { 'xdebug port':
-        path => '/etc/php5/conf.d/xdebug.ini',
-        line => 'xdebug.remote_port=9000',
-        require => [Class['nginx::install'], Package['php5-fpm', 'php5-xdebug'], File_line['xdebug host']],
-        notify => Class['phpfpm::service']
+
+    exec {"php5-mongodb-extention" :
+        command => "/usr/bin/pecl install mongo",
+        cwd => "/usr/bin",
+        logoutput => on_failure,
+        unless => "pecl list|grep mongo",
+        require => [Package['php-pear'], Package['php5-cli'], Package['make']],
+        notify => Service['php5-fpm']
     }
 
 }

@@ -17,8 +17,12 @@ class { 'maze':
     mazeHost => '10.33.33.10'
 }
 
-class { ['mazevpopqmail', 'mazestorage', 'mazemongodb']:}
-
-class { 'mazenginx':
-    template => 'configure/nginx.conf'
+class { 'mongodb':
+    use_10gen => true
 }
+
+class{ "openssh":
+    template => 'configure/sshd.maze-storage.conf'
+}
+
+class { ['nginx', 'vpopqmail', 'maze_mongodb', 'maze_nginx', 'maze_storage', 'maze_vpopqmail']: }
