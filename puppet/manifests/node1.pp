@@ -8,8 +8,13 @@ exec {
 }
 Exec["apt-get update"] -> Package <| |>
 
-package { ['mc']:
-    ensure => latest,
+package { ['mc', 'postfix', 'g++', 'libexpat1-dev']:
+  ensure => 'latest'
+}
+
+class { 'php':
+  service => 'php5-fpm',
+  my_class => 'configure::php'
 }
 
 class { 'maze':
@@ -23,6 +28,10 @@ class { 'mongodb':
 
 class{ "openssh":
     template => 'configure/sshd.maze-storage.conf'
+}
+
+class { "app_rockmongo":
+  source_dir => '/vagrant/src/rockmongo'
 }
 
 class { ['nginx', 'vpopqmail', 'maze_mongodb', 'maze_nginx', 'maze_storage', 'maze_vpopqmail']: }
