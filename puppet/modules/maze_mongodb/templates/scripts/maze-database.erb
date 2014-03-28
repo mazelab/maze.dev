@@ -175,26 +175,7 @@ getDatabases()
         return 128
     fi
 
-    DBS_SUCCESS=""
-    DBS_FAILED=""
-    for DATABASE in $DBS; do
-        if ! DB_INFO=`getDatabase`; then
-            DBS_FAILED="${DBS_FAILED}failed to fetch database ${DATABASE}\n"
-            continue
-        fi
-
-        if [ -n "$DBS_SUCCESS" ]; then
-            DBS_SUCCESS="${DBS_SUCCESS}\n\n"
-        fi
-
-        DBS_SUCCESS="${DBS_SUCCESS}${DB_INFO}"
-    done
-
-    if [ -n "DBS_FAILED" ]; then
-        DBS_FAILED="${DBS_FAILED}\n"
-    fi
-
-    echo -e "${DBS_FAILED}${DBS_SUCCESS}"
+    echo "$DBS"
 }
 
 ##

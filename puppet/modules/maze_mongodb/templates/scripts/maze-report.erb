@@ -22,12 +22,64 @@ escapeJSON() {
     echo "$RAW"
 }
 
-report()
+getDatabaseJson()
 {
-    echo "{}"
+    if [ -z "$1" ]; then
+        return 111
+    fi
 
-    exit 0
+    if ! DATABASE_INFO=`maze mongodb database "$1"`; then
+        echo "$DATABASE_INFO"
+        return 112
+    fi
+
+    DATABASE_NAME=`echo "$DATABASE_INFO" | grep '^db: ' | awk '{print $2}'`
+    DATABASE_PWD=`echo "$DATABASE_INFO" | grep '^pwd: ' | awk '{print $2}'`
+
+    DATABASE_DATASIZE=`echo "$DATABASE_INFO" | grep '^dataSize: ' | awk '{print $2}'`
+    DATABASE_INDEXSIZE=`echo "$DATABASE_INFO" | grep '^indexSize: ' | awk '{print $2}'`
+    DATABASE_STORAGESIZE=`echo "$DATABASE_INFO" | grep '^storageSize: ' | awk '{print $2}'`
+    DATABASE_FILESIZE=`echo "$DATABASE_INFO" | grep '^fileSize: ' | awk '{print $2}'`
+
+    DATABASE_JSON="\"$DATABASE_NAME\": {\"name\":\"$DATABASE_NAME\""
+    DATABASE_JSON="${DATABASE_JSON}, \"password\":\"$DATABASE_PWD\""
+    DATABASE_JSON="${DATABASE_JSON}, \"dataSize\":\"$DATABASE_DATASIZE\""
+    DATABASE_JSON="${DATABASE_JSON}, \"indexSize\":\"$DATABASE_INDEXSIZE\""
+    DATABASE_JSON="${DATABASE_JSON}, \"storageSize\":\"$DATABASE_STORAGESIZE\""
+    DATABASE_JSON="${DATABASE_JSON}, \"fileSize\":\"$DATABASE_FILESIZE\"}"
+
+    echo "$DATABASE_JSON"
 }
 
+report()
+{
+    DATABASES=`maze mongodb database`
+    if [ -z "$DATABASES" ]; then
+        echo "{}"
+        exit 0
+    fi
+
+    DATABASES_JSON=""
+    for DATABASE in $DATABASES; do
+        if [ -z "$DATABASE" ]; then
+            continue
+        fi
+        if ! DATABASE_JSON=`getDatabaseJson "$DATABASE"`; then
+            continue
+        fi
+
+        if [ -n "$DATABASE_JSON" ];then
+            # add comma if there is a previous object
+            if [ ! -z "$DATABASES_JSON" ]; then
+                DATABASES_JSON="${DATABASES_JSON},"
+            fi
+
+            DATABASES_JSON="${DATABASES_JSON}${DATABASE_JSON}"
+        fi
+    done
+
+    echo "{$DATABASES_JSON}"
+}
 
 report
+exit "$?"

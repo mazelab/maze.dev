@@ -111,16 +111,16 @@ sendModule()
     fi
 
     # show http response
-    curl -H "${HEADER_REQUESTED_WITH}" -H "${HEADER_NODE_IP}" -H "${HEADER_NODE_NAME}" -H "${HEADER_NODE_API}" -F "report=@${REPORT_FILE_TMP}" "${URL}"
-    echo "curl -H \"${HEADER_REQUESTED_WITH}\" -H \"${HEADER_NODE_IP}\" -H \"${HEADER_NODE_NAME}\" -H \"${HEADER_NODE_API}\" -F \"report=@${REPORT_FILE_TMP}\" \"${URL}\""
+    #curl -H "${HEADER_REQUESTED_WITH}" -H "${HEADER_NODE_IP}" -H "${HEADER_NODE_NAME}" -H "${HEADER_NODE_API}" -F "report=@${REPORT_FILE_TMP}" "${URL}"
+    #echo "curl -H \"${HEADER_REQUESTED_WITH}\" -H \"${HEADER_NODE_IP}\" -H \"${HEADER_NODE_NAME}\" -H \"${HEADER_NODE_API}\" -F \"report=@${REPORT_FILE_TMP}\" \"${URL}\""
 
-    #HTTP_CODE=`curl -s -o /dev/null -w "%{http_code}" -H "${HEADER_REQUESTED_WITH}" -H "${HEADER_NODE_IP}" -H "${HEADER_NODE_NAME}" -H "${HEADER_NODE_API}" -F "report=@${REPORT_FILE_TMP}" "${URL}"`
-    #STATUS="$?"
+    HTTP_CODE=`curl -s -o /dev/null -w "%{http_code}" -H "${HEADER_REQUESTED_WITH}" -H "${HEADER_NODE_IP}" -H "${HEADER_NODE_NAME}" -H "${HEADER_NODE_API}" -F "report=@${REPORT_FILE_TMP}" "${URL}"`
+    STATUS="$?"
 
-    #if [ "$HTTP_CODE" != 200 ];then
-    #    echo "Failed to send report of module ${MODULE} with Response code ${HTTP_CODE}"
-    #    return 117
-    #fi
+    if [ "$HTTP_CODE" != 200 ];then
+        echo "Failed to send report of module ${MODULE} with Response code ${HTTP_CODE}"
+        return 117
+    fi
 
     RESULT_TMP=`rm ${REPORT_FILE_TMP}`
     if [ "$?" != 0 ];then
