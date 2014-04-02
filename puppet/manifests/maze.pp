@@ -20,6 +20,7 @@ class { "app_rockmongo":
     source_dir => '/vagrant/src/rockmongo'
 }
 class { "app_maze":
+    hostname => '10.33.33.10 maze.core',
     source_dir => '/vagrant/src/maze.core',
     environment => 'development'
 }

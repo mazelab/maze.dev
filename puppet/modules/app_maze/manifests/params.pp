@@ -18,4 +18,5 @@ class app_maze::params
     $environment = 'production'
     $owner = 'vagrant'
     $group = 'vagrant'
+    $hostname = 'maze.core'
 }
