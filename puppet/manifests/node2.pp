@@ -13,8 +13,10 @@ package { ['mc', 'postfix', 'g++', 'libexpat1-dev']:
 }
 
 class { 'php':
-  service => 'php5-fpm',
-  my_class => 'configure::php'
+    service => 'php5-fpm',
+    package => 'php5-fpm',
+    my_class => 'configure::php',
+    config_file => '/etc/php5/fpm/php.ini'
 }
 
 class { 'maze':

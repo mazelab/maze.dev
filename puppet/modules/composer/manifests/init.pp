@@ -1,15 +1,14 @@
 class composer(
   $target_dir      = '/usr/local/bin',
   $composer_file   = 'composer',
-  $logoutput       = false) {
+  $logoutput       = false,
+  $tmp_path        = '/tmp') {
 
   include augeas
 
   $php_package     = 'php5-cli'
-  $tmp_path        = '/home/vagrant'
 
   # download composer
-
   exec { 'download_composer':
     command     => 'wget http://getcomposer.org/composer.phar -O composer.phar',
     cwd         => $tmp_path,

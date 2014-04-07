@@ -1,4 +1,6 @@
 class configure::php (
+    $user                 = 'vagrant',
+    $group                = 'vagrant'
 ) {
 
     service { 'php5-fpm':
@@ -7,21 +9,21 @@ class configure::php (
       hasrestart => true
     }
 
-    package{ ['php-pear', 'make']:
+    package{ ['php-pear', 'php5-cli', 'make']:
         ensure => 'latest'
     }
 
     php::module{ ['gd', 'fpm', 'mcrypt', 'xdebug', 'cli', 'curl']:}
 
-    file_line { '/etc/php5/fpm/pool.d/www.conf - www-user':
+    file_line { "php5-fpm user - $user":
         path => '/etc/php5/fpm/pool.d/www.conf',
-        line => 'user = vagrant',
+        line => "user = $user",
         require => Package['php5-fpm'],
         notify => Service['php5-fpm']
     }
-    file_line { '/etc/php5/fpm/pool.d/www.conf - www-group':
+    file_line { "php5-fpm group - $group":
         path => '/etc/php5/fpm/pool.d/www.conf',
-        line => 'group = vagrant',
+        line => "group = $group",
         require => Package['php5-fpm'],
         notify => Service['php5-fpm']
     }

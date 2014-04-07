@@ -13,7 +13,13 @@ package { ['mc', 'postfix', 'g++', 'libexpat1-dev']:
 
 class { 'php':
     service => 'php5-fpm',
-    my_class => 'configure::php'
+    package => 'php5-fpm',
+    my_class => 'configure::php',
+    config_file => '/etc/php5/fpm/php.ini'
+}
+
+class { 'nginx':
+    manage_repo => false
 }
 
 class { "app_rockmongo":
@@ -28,5 +34,3 @@ class { "app_maze":
 class { 'mongodb':
     use_10gen => true
 }
-
-class { 'nginx': }

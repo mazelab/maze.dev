@@ -37,6 +37,7 @@ class app_maze (
     $group                = params_lookup( 'group' ),
     $environment          = params_lookup( 'environment' )
 ) inherits app_maze::params {
+    $hostname_sanitized = regsubst($hostname, ' ', '_', 'G')
 
     git::reposync { "$hostname maze.core":
         source_url      => $repository,
@@ -49,7 +50,7 @@ class app_maze (
         class {"composer":
             target_dir      => '/usr/bin',
             composer_file   => 'composer',
-            require         => Package['php5']
+            require         => Package['php5-cli']
         }
     }
 
@@ -61,29 +62,16 @@ class app_maze (
         require => [Class['composer'], Git::Reposync["$hostname maze.core"]]
     }
 
-    nginx::resource::vhost { "$hostname":
-        www_root => "$source_dir/src/public",
-        listen_port => '80',
-        try_files => ['$uri $uri/ /index.php?$args']
+    file{ "${nginx::params::nx_conf_dir}/sites-available/${hostname_sanitized}.conf":
+        ensure => 'present',
+        content => template('app_maze/vhost.cfg'),
+        notify => Service['nginx']
     }
 
-    nginx::resource::location { "$hostname php-fpm":
-        ensure   => present,
-        www_root => "$source_dir/src/public",
-        location => '~ \.php$',
-        vhost    => "$hostname",
-        fastcgi => '127.0.0.1:9000',
-        fastcgi_script => "$source_dir/src/public/index.php",
-        location_cfg_append => {
-            "fastcgi_param" => "APPLICATION_ENV $environment"
-        }
-    }
-
-    nginx::resource::location { "$hostname module public rewrite":
-        ensure  => present,
-        location => '~ ^\/module\/(?<vendor>[^\/]*)\/(?<module>[^\/]*)\/(?<file>.*)$',
-        location_alias => '/vagrant/src/maze.core/src/modules/$vendor/$module/public/$file',
-        vhost => "$hostname"
+    file{ "${nginx::params::nx_conf_dir}/sites-enabled/${hostname_sanitized}.conf":
+        target => "${nginx::params::nx_conf_dir}/sites-available/${hostname_sanitized}.conf",
+        ensure => 'link',
+        notify => Service['nginx']
     }
 
 }
