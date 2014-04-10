@@ -14,4 +14,8 @@
 class maze_mongodb::params inherits maze
 {
 
+    $admin_user = ''
+    $admin_pwd = ''
+    $admin_db = ''
+
 }

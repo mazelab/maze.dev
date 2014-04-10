@@ -8,6 +8,71 @@
 #
 ###############################################################################
 
-# maze vars
-MAZE_HOME="/etc/maze"
+##
+# Mongodb admin authentication
+#
+# if no admin authentication data is given then it tries without auth
+#
+# required admin roles and used actions
+#   clusterAdmin:
+#           - dropDatabase
+#           - listDatabases
+#
+#   userAdminAnyDatabase:
+#           - insert (only system.users collections)
+#            -update (only system.users collections)
+#
+#   dbAdminAnyDatabase:
+#           - dbStats
+#
+##
+
+# set admin user name for admin authentication
+ADMIN_USER="<%= @admin_user %>"
+# set admin password for authentication
+ADMIN_PWD="<%= @admin_pwd %>"
+# set admin database for authentication
+ADMIN_DB="<%= @admin_db %>"
+
+####
+# default behavior
+####
+MONGODB_BIN="`which mongo`"
+
+##
+# check environment
+##
+checkEnvironment()
+{
+    if ! [ -n "$MONGODB_BIN" ]; then
+        echo "mongodb binary not found"
+        exit 90
+    fi
+}
+
+###
+# build mongodb shell cmd and execute it
+#
+# @param string mongodb command line
+# @param string (optional) database to use if not provided database
+###
+mongodbCmd()
+{
+    CMD="$1"
+    if [ -n "$2" ]; then
+        CMD_DB="$2"
+    else
+        CMD_DB="$DB_NAME"
+    fi
+
+    if [ -z "$CMD_DB" -o -z "$CMD" ]; then
+        return 93
+    fi
+
+    if [ -n "$ADMIN_USER" -a -n "$ADMIN_PWD" -a -n "$ADMIN_DB" ]; then
+        $MONGODB_BIN --quiet -u "$ADMIN_USER" -p "$ADMIN_PWD" --authenticationDatabase "$ADMIN_DB" --eval "${CMD}" "$CMD_DB"
+    else
+        $MONGODB_BIN --quiet --eval "${CMD}" "$CMD_DB"
+    fi
+}
 

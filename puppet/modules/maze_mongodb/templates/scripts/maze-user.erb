@@ -1,0 +1,247 @@
+##
+# maze script to manage mongodb users
+#
+###############################################################################
+
+####
+# default behavior
+####
+DB_ROLES="\"readWrite\", \"dbAdmin\", \"userAdmin\""
+
+###
+# create new user in a mongodb database
+###
+_createUser()
+{
+    echo "create user $DB_USER in database $DB_NAME..."
+
+    CMD="db.system.users.insert({user:\"${DB_USER}\", pwd: \"${DB_PWD}\", roles: [${DB_ROLES}]})";
+    if ! mongodbCmd "$CMD" ; then
+        echo "failed to create user $DB_USER in database $DB_NAME"
+        return 103
+    fi
+}
+
+###
+# update a user in a mongodb database
+#
+# @param string DB_USER_INFO user info provided from getDbUser
+###
+_updateUser()
+{
+    if [ -z "$1" ]; then
+        return 104
+    fi
+    DB_USER_INFO="$1"
+
+    if ! DB_USER_PWD=`echo "$DB_USER_INFO" | grep -i "^pwd:" | awk '{print($2)}'` || test -z "$DB_USER_PWD"; then
+        echo "failed to fetch password of user $DB_USER of database $DB_NAME"
+        return 104
+    fi
+
+    if [ "$DB_USER_PWD" != "$DB_PWD" ]; then
+        echo "update user ${DB_USER} in database $DB_NAME..."
+
+        CMD="db.system.users.update({user: \"$DB_USER\"}, {\$set: {pwd: \"$DB_PWD\"}})";
+        if ! mongodbCmd "$CMD" ; then
+            echo "failed to update password of $DB_USER for database $DB_NAME"
+            return 104
+        fi
+    fi
+}
+
+###
+# delete a user in a mongodb database
+###
+deleteDbUser()
+{
+    if ! RESULT_USER=`getDbUser`; then
+        echo "user $DB_USER not found in $DB_NAME"
+        return 105
+    else
+        echo "delete user $DB_USER in database $DB_NAME..."
+
+        CMD="db.system.users.remove({user:\"${DB_USER}\"})";
+        if ! mongodbCmd "$CMD" ; then
+            echo "failed to delete user $DB_USER in database $DB_NAME"
+            return 103
+        fi
+    fi
+}
+
+###
+# encrypt given password string
+###
+encryptPassword()
+{
+    if ! [ -n "$DB_USER" -a -n "$DB_PWD" ]; then
+        return 101
+    fi
+
+    echo -n "$DB_USER:mongo:$DB_PWD" | md5sum | awk '{print($1)}'
+    return 0
+}
+
+###
+# get a certain db user of a certain database
+###
+getDbUser()
+{
+    CMD="db.system.users.find({user: '$DB_USER'}, {user: 1, pwd: 1, _id: 0}).forEach(function(doc) {print('user: ' + doc.user);print('pwd: ' + doc.pwd);print('')})"
+    if ! RESULT_USER=`mongodbCmd "$CMD"` ; then
+        echo "failed to fetch user $DB_USER from db $DATABASE"
+        return
+    fi
+
+    if [ -z "$RESULT_USER" ];then
+        echo "user $DB_USER not found in database $DB_NAME"
+        return 102
+    fi
+
+    echo "$RESULT_USER"
+}
+
+###
+# list all users of a certain database
+###
+getDbUsers()
+{
+    CMD='db.system.users.find({}, {user: 1, pwd: 1, _id: 0}).forEach(function(doc) {print("user: " + doc.user);print("pwd: " + doc.pwd);print("")})'
+    if ! RESULT_USERS=`mongodbCmd "$CMD"` ; then
+        echo "failed to fetch users from db $DB_NAME"
+        return
+    fi
+
+    echo "$RESULT_USERS"
+}
+
+###
+# render help info
+###
+renderHelp()
+{
+    echo "Usage: maze mongodb user <[options]> [|set|delete]
+$*
+    Options:
+            -P              password
+            -U              name of the user
+            -D              name of the database
+            -e              flag to determine that given password is already encrypted
+            -h              show help
+
+    Methods:
+            [] default      Show all db users
+
+                            Required Parameters:
+                                -D      name of the database
+
+            [delete]        deletes existing db user
+
+                            Required Parameters:
+                                -U      name of the user
+                                -D      name of the database
+
+
+            [set]           set db user
+
+                            Required Parameters:
+                                -P      password (encrypted or raw)
+                                -U      name of the user
+                                -D      name of the database
+
+                            Optional Parameters:
+                                -e      flag to determine that given password is already encrypted
+"
+}
+
+###
+# set user data of a certain user in a certain database
+###
+setDbUser()
+{
+    if [ "$DB_PWD_ENCRYPTED" != "true" ]; then
+        if ! DB_PWD=`encryptPassword "$DB_PWD"`; then
+            echo "failed to encrypt password"
+            return 101
+        fi
+    fi
+
+    if ! RESULT_USER=`getDbUser`; then
+        if ! RESULT_CREATE=`_createUser`; then
+            echo "$RESULT_CREATE"
+            return 103
+        fi
+    else
+        if ! RESULT_UPDATE=`_updateUser "$RESULT_USER"`; then
+            echo "$RESULT_UPDATE"
+            return 104
+        fi
+    fi
+}
+
+# parse options
+while getopts "ehP:U:D:" opt; do
+    case $opt in
+        D)
+            if [[ $OPTARG = -* ]]; then
+                echo "Option -D has a invalid argument"
+                exit 1
+            fi
+            DB_NAME="$OPTARG"
+        ;;
+        P)
+            if [[ $OPTARG = -* ]]; then
+                echo "Option -P has a invalid argument"
+                exit 1
+            fi
+            DB_PWD="$OPTARG"
+        ;;
+        U)
+            if [[ $OPTARG = -* ]]; then
+                echo "Option -U has a invalid argument"
+                exit 1
+            fi
+            DB_USER="$OPTARG"
+        ;;
+        h)
+            renderHelp && exit 0
+        ;;
+        e)
+            DB_PWD_ENCRYPTED="true"
+        ;;
+        :)
+            renderHelp && exit 100
+        ;;
+    esac
+done
+
+shift `expr $OPTIND - 1`
+COMMAND="$1"
+
+# parse actions
+case $COMMAND in
+    delete)
+        if [ -n "$DB_NAME" -a -n "$DB_USER" ]; then
+            deleteDbUser
+            exit "$?"
+        fi
+    ;;
+    set)
+        if [ -n "$DB_NAME" -a -n "$DB_PWD" -a -n "$DB_USER" ]; then
+            setDbUser
+            exit "$?"
+        fi
+    ;;
+    *)
+        if [ -n "$DB_NAME" -a -n "$DB_USER" ]; then
+            getDbUser
+            exit "$?"
+        elif [ -n "$DB_NAME" ]; then
+            getDbUsers
+            exit "$?"
+        fi
+    ;;
+esac
+
+renderHelp
+exit 100
