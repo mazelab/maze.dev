@@ -44,8 +44,8 @@ define maze::script (
         file { "$fork":
             mode    => 750,
             ensure  => present,
-            owner   => "$maze::username",
-            group   => "$maze::groupname",
+            owner   => "root",
+            group   => "root",
             content => template("${module_name}/fork.erb")
         }
 
@@ -61,8 +61,8 @@ define maze::script (
                 ensure	=> directory,
                 mode	=> 0750,
                 force	=> true,
-                owner   => "$maze::username",
-                group   => "$maze::groupname",
+                owner   => "root",
+                group   => "root",
                 require => File["$fork"]
             }
         }
@@ -71,8 +71,8 @@ define maze::script (
             ensure  => file,
             mode    => 0750,
             force   => true,
-            owner   => "$maze::username",
-            group   => "$maze::groupname",
+            owner   => "root",
+            group   => "root",
             content => "$content",
             require => [File["$fork"], File["$path"]]
         }
@@ -82,8 +82,8 @@ define maze::script (
             mode    => 0750,
             recurse => true,
             force   => true,
-            owner   => "$maze::username",
-            group   => "$maze::groupname",
+            owner   => "root",
+            group   => "root",
             source  => "$source",
             require => File["$fork"]
         }
