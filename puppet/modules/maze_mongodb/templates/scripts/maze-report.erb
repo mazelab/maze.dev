@@ -5,7 +5,7 @@
 
 report()
 {
-    CMD="var report={};db.runCommand({listDatabases:1}).databases.forEach(function(doc){if(doc.empty===true){return false}var database=db.getSiblingDB(doc.name),stats=database.stats(),dbReport={};dbReport.name=doc.name;dbReport.users=database.system.users.find({},{user:1,pwd:1,_id:0}).toArray();dbReport.stats={'dataSize':stats.dataSize,'indexSize':stats.indexSize,'storageSize':stats.storageSize,'fileSize':stats.fileSize};report[doc.name] = dbReport});printjson(report)";
+    CMD="var report={};db.runCommand({listDatabases:1}).databases.forEach(function(doc){if(doc.empty===true){return false}var database=db.getSiblingDB(doc.name),stats=database.stats(),dbReport={name:doc.name,users:{},stats:{'dataSize':stats.dataSize,'indexSize':stats.indexSize,'storageSize':stats.storageSize,'fileSize':stats.fileSize}};database.system.users.find({},{user:1,pwd:1,roles:1}).forEach(function(userDoc){var result={name:userDoc.user,password:userDoc.pwd,roles:{read:userDoc.roles.indexOf('read')||userDoc.roles.indexOf('readWrite')?true:false,write:userDoc.roles.indexOf('write')||userDoc.roles.indexOf('readWrite')?true:false,userAdmin:userDoc.roles.indexOf('userAdmin')?true:false,dbAdmin:userDoc.roles.indexOf('dbAdmin')?true:false},status:true};dbReport.users[hex_md5(userDoc.user)]=result});report[doc.name]=dbReport});printjson(report);";
     if ! REPORT=`mongodbCmd "$CMD" "admin"`; then
         echo "failed to generate report"
         return 100
