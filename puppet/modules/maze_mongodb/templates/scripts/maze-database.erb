@@ -37,7 +37,7 @@ getDbStats()
 ###
 listDatabases()
 {
-    CMD="db.runCommand({listDatabases: 1}).databases.forEach(function(doc){if(doc.empty !== true) {print(doc.name)};});"
+    CMD="db.runCommand({listDatabases: 1}).databases.forEach(function(doc){if(doc.empty !== true && doc.name !== 'admin') {print(doc.name)};});"
     if ! DB_JSON=`mongodbCmd "$CMD" "admin"` ; then
         echo "failed to fetch databases list"
         return 101
@@ -53,6 +53,8 @@ renderHelp()
 {
     echo "Usage: maze mongodb database <[options]> [|stats|delete]
 $*
+    admin db will be ignored
+
     Options:
             -D              name of the database
             -h              show help
@@ -81,6 +83,10 @@ while getopts "ehP:D:" opt; do
             fi
 
             DB_NAME="$OPTARG"
+            if [ "$DB_NAME" == "admin" ]; then
+                echo "Usage with admin database is not allowed!"
+                exit 1
+            fi
         ;;
         h)
             renderHelp && exit 0

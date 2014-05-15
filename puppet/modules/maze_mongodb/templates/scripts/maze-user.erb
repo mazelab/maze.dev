@@ -6,7 +6,10 @@
 ####
 # default behavior
 ####
-DB_ROLES="\"readWrite\", \"dbAdmin\", \"userAdmin\""
+DB_ROLES_READ="false"
+DB_ROLES_WRITE="false"
+DB_ROLES_USERADMIN="false"
+DB_ROLES_DBADMIN="false"
 
 ###
 # create new user in a mongodb database
@@ -15,6 +18,7 @@ _createUser()
 {
     echo "create user $DB_USER in database $DB_NAME..."
 
+    DB_ROLES=`_buildRoles`;
     CMD="db.system.users.insert({user:\"${DB_USER}\", pwd: \"${DB_PWD}\", roles: [${DB_ROLES}]})";
     if ! mongodbCmd "$CMD" ; then
         echo "failed to create user $DB_USER in database $DB_NAME"
@@ -35,19 +39,74 @@ _updateUser()
     DB_USER_INFO="$1"
 
     if ! DB_USER_PWD=`echo "$DB_USER_INFO" | grep -i "^pwd:" | awk '{print($2)}'` || test -z "$DB_USER_PWD"; then
-        echo "failed to fetch password of user $DB_USER of database $DB_NAME"
+        echo "failed to fetch password of user $DB_USER in database $DB_NAME"
+        return 104
+    fi
+    if ! DB_USER_ROLE_READ=`echo "$DB_USER_INFO" | grep -i "^read:" | awk '{print($2)}'` || test -z "$DB_USER_ROLE_READ"; then
+        echo "failed to fetch role read of user $DB_USER in database $DB_NAME"
+        return 104
+    fi
+    if ! DB_USER_ROLE_WRITE=`echo "$DB_USER_INFO" | grep -i "^write:" | awk '{print($2)}'` || test -z "$DB_USER_ROLE_WRITE"; then
+        echo "failed to fetch role write of user $DB_USER in database $DB_NAME"
+        return 104
+    fi
+    if ! DB_USER_ROLE_USERADMIN=`echo "$DB_USER_INFO" | grep -i "^userAdmin:" | awk '{print($2)}'` || test -z "$DB_USER_ROLE_USERADMIN"; then
+        echo "failed to fetch role userAdmin of user $DB_USER in database $DB_NAME"
+        return 104
+    fi
+    if ! DB_USER_ROLE_DBADMIN=`echo "$DB_USER_INFO" | grep -i "^dbAdmin:" | awk '{print($2)}'` || test -z "$DB_USER_ROLE_DBADMIN"; then
+        echo "failed to fetch role dbAdmin of user $DB_USER in database $DB_NAME"
         return 104
     fi
 
-    if [ "$DB_USER_PWD" != "$DB_PWD" ]; then
+    if [ "$DB_USER_PWD" != "$DB_PWD" -o "$DB_USER_ROLE_READ" != "$DB_ROLES_READ" -o "$DB_USER_ROLE_WRITE" != "$DB_ROLES_WRITE" -o "$DB_USER_ROLE_USERADMIN" != "$DB_ROLES_USERADMIN" -o "$DB_USER_ROLE_DBADMIN" != "$DB_ROLES_DBADMIN" ]; then
         echo "update user ${DB_USER} in database $DB_NAME..."
 
-        CMD="db.system.users.update({user: \"$DB_USER\"}, {\$set: {pwd: \"$DB_PWD\"}})";
+
+        DB_ROLES=`_buildRoles`;
+        CMD="db.system.users.update({user: \"$DB_USER\"}, {\$set: {pwd: \"$DB_PWD\", roles: [${DB_ROLES}]}})";
         if ! mongodbCmd "$CMD" ; then
             echo "failed to update password of $DB_USER for database $DB_NAME"
             return 104
         fi
     fi
+}
+
+###
+# build roles from given parameters
+#
+# @return string role definition in json
+###
+_buildRoles()
+{
+    ROLES=""
+
+    if [ "$DB_ROLES_READ" != "false" -a "$DB_ROLES_WRITE" == "false" ]; then
+        if [ "$ROLES" ]; then
+            ROLES="$ROLES,"
+        fi
+        ROLES="\"read\""
+    fi
+    if [ "$DB_ROLES_WRITE" != "false" ]; then
+        if [ "$ROLES" ]; then
+            ROLES="$ROLES,"
+        fi
+        ROLES="$ROLES\"readWrite\""
+    fi
+    if [ "$DB_ROLES_USERADMIN" != "false" ]; then
+        if [ "$ROLES" ]; then
+            ROLES="$ROLES,"
+        fi
+        ROLES="$ROLES\"userAdmin\""
+    fi
+    if [ "$DB_ROLES_DBADMIN" != "false" ]; then
+        if [ "$ROLES" ]; then
+            ROLES="$ROLES,"
+        fi
+        ROLES="$ROLES\"dbAdmin\""
+    fi
+
+    echo "$ROLES"
 }
 
 ###
@@ -87,7 +146,7 @@ encryptPassword()
 ###
 getDbUser()
 {
-    CMD="db.system.users.find({user: '$DB_USER'}, {user: 1, pwd: 1, _id: 0}).forEach(function(doc) {print('user: ' + doc.user);print('pwd: ' + doc.pwd);print('')})"
+    CMD="db.system.users.find({user: '$DB_USER'}, {user: 1, pwd: 1, roles: 1, _id: 0}).forEach(function(doc) {var roles={read:(doc.roles.indexOf('read') > -1)||(doc.roles.indexOf('readWrite') > -1)?true:false,write:(doc.roles.indexOf('readWrite') > -1)?true:false,userAdmin:(doc.roles.indexOf('userAdmin') > -1)?true:false,dbAdmin:(doc.roles.indexOf('dbAdmin') > -1)?true:false};print('user: ' + doc.user);print('pwd: ' + doc.pwd);print('Permissions');print('read: ' + roles.read);print('write: ' + roles.write);print('userAdmin: ' + roles.userAdmin);print('dbAdmin: ' + roles.dbAdmin);print('');})"
     if ! RESULT_USER=`mongodbCmd "$CMD"` ; then
         echo "failed to fetch user $DB_USER from db $DATABASE"
         return
@@ -106,7 +165,7 @@ getDbUser()
 ###
 getDbUsers()
 {
-    CMD='db.system.users.find({}, {user: 1, pwd: 1, _id: 0}).forEach(function(doc) {print("user: " + doc.user);print("pwd: " + doc.pwd);print("")})'
+    CMD="db.system.users.find({}, {user: 1, pwd: 1, roles:1, _id: 0}).forEach(function(doc) {var roles={read:(doc.roles.indexOf('read') > -1)||(doc.roles.indexOf('readWrite') > -1)?true:false,write:(doc.roles.indexOf('readWrite') > -1)?true:false,userAdmin:(doc.roles.indexOf('userAdmin') > -1)?true:false,dbAdmin:(doc.roles.indexOf('dbAdmin') > -1)?true:false};print('user: ' + doc.user);print('pwd: ' + doc.pwd);print('Permissions');print('read: ' + roles.read);print('write: ' + roles.write);print('userAdmin: ' + roles.userAdmin);print('dbAdmin: ' + roles.dbAdmin);print('');})"
     if ! RESULT_USERS=`mongodbCmd "$CMD"` ; then
         echo "failed to fetch users from db $DB_NAME"
         return
@@ -126,6 +185,10 @@ $*
             -P              password
             -U              name of the user
             -D              name of the database
+            -r              permission to read database
+            -w              permission to write in database (includes read)
+            -d              permission to administrate database
+            -u              permission to administrate database users
             -e              flag to determine that given password is already encrypted
             -h              show help
 
@@ -134,6 +197,9 @@ $*
 
                             Required Parameters:
                                 -D      name of the database
+
+                            Optional Parameter:
+                                -U      name of the user
 
             [delete]        deletes existing db user
 
@@ -151,6 +217,10 @@ $*
 
                             Optional Parameters:
                                 -e      flag to determine that given password is already encrypted
+                                -r      permission to read database
+                                -w      permission to write in database (includes read)
+                                -d      permission to administrate database
+                                -u      permission to administrate database users
 "
 }
 
@@ -180,7 +250,7 @@ setDbUser()
 }
 
 # parse options
-while getopts "ehP:U:D:" opt; do
+while getopts "ehP:U:D:rwud" opt; do
     case $opt in
         D)
             if [[ $OPTARG = -* ]]; then
@@ -188,6 +258,10 @@ while getopts "ehP:U:D:" opt; do
                 exit 1
             fi
             DB_NAME="$OPTARG"
+            if [ "$DB_NAME" == "admin" ]; then
+                echo "Usage with admin database is not allowed!"
+                exit 1
+            fi
         ;;
         P)
             if [[ $OPTARG = -* ]]; then
@@ -202,6 +276,18 @@ while getopts "ehP:U:D:" opt; do
                 exit 1
             fi
             DB_USER="$OPTARG"
+        ;;
+        r)
+            DB_ROLES_READ="true"
+        ;;
+        w)
+            DB_ROLES_WRITE="true"
+        ;;
+        u)
+            DB_ROLES_USERADMIN="true"
+        ;;
+        d)
+            DB_ROLES_DBADMIN="true"
         ;;
         h)
             renderHelp && exit 0
