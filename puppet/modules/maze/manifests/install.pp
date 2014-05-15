@@ -68,7 +68,7 @@ class maze::install inherits maze{
         path    => "/usr/local/bin/:/usr/bin:/bin:/usr/sbin",
         command => "sudo maze api key generate",
         user => "$username",
-        unless => "maze api key",
+        unless => "sudo maze api key",
         require => [File["$homedir/api/key"], File["$mazeLib/maze-api"]]
     }
 
